@@ -1,0 +1,61 @@
+Location (id, X, Y)
+Street (sname, X1, Y1, X2, Y2)
+locOnStr (id, sname)
+distance (id1, id2, dist)
+
+query to find 2 places on 2 diffrent street but the 2 are  on an equal third street :
+*************************************************
+Select l1.sname, l2.sname,
+    From locOnStr as l1, locOnStr as l2
+    Where l1.sname<l2.sname and exists
+                                (select *
+                                 From locOnStr o1 join LocOnStr o2 on (sname)
+                                  Where o1.sname<>l1.sname and o1.sname<>l2.sname and o1.id=l1.id and
+                                                                                          o2.id=l2.id)
+*******************************************************************
+trigger to insert the ditance into dist between 2 exicting places
+*******************************************************************
+Create or replace function to_do() returns trigger as $$
+            Declare
+C refcursor;
+Id integer;
+X float;
+Y float;
+Dist float;
+       Begin
+Open c for select * from location;
+Loop
+Fetch C into id, X, Y;
+Exit when not found;
+Dist=sqrt((X-new.X)*(X-new.X)+(Y-new.Y)*(Y-new.Y));
+Insert into distance values (id, new.id, dist);
+if id<>new.id then
+Insert into distance values (new.id, id, dist);
+end if;
+End loop;
+Close c;
+Return null;
+end;
+$$ language plpgsql;
+
+
+
+Create trigger what_do_I_check
+After insert on location
+For each row
+Execute procedure to_do();
+
+
+***************************************************************
+finding 2 places where the distance between them are the bigger 
+****************************************************************
+
+
+
+Select L1.sname, id1, id2
+From distance, locOnStr L1, locOnStr L2
+Where L1.sname=L2.sname and L1.id=id1 and L2.id=id2 and dist>=all
+                              (select dist
+                               From distance, locOnStr L3, locOnStr L4   
+                               Where L3.sname=L4.sname and L3.id=id1 and L4.id=id2 and
+                                L3.sname=L1.sname)
